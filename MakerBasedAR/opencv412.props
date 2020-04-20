@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_PropertySheetDisplayName>opencv412_with_realsense</_PropertySheetDisplayName>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Program Files %28x86%29\Intel RealSense SDK 2.0\include;C:\Program Files\OpenCV4.1.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <Optimization>Full</Optimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\Intel RealSense SDK 2.0\lib\x64;C:\Program Files\OpenCV4.1.2\x64\vc14\staticlib;C:\Program Files\OpenCV4.1.2\x64\vc14\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>correspondence.lib;multiview.lib;numeric.lib;simple_pipeline.lib;opencv_img_hash412.lib;opencv_sfm412.lib;opencv_world412.lib;opencv_img_hash412d.lib;opencv_sfm412d.lib;opencv_world412d.lib;realsense2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup />
+</Project>

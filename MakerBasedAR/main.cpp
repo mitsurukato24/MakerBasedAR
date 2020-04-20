@@ -1,39 +1,79 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include <opencv2/aruco.hpp>
 #include <librealsense2/rs.hpp>
+#include <time.h>
 
 #define ESC_KEY 27
 #define SPACE_KEY 32
 
 int main() try
 {
-	// Use RealSense 435
-	rs2::log_to_console(RS2_LOG_SEVERITY_ERROR);
-	
+	cv::FileStorage fs("../Calibration/output_camera_data_0421025752.yml", cv::FileStorage::READ);
+	if (!fs.isOpened())
+	{
+		std::cout << "File can not be opened. \n";
+		return -1;
+	}
+
+	// --- open yml file for camera calibration
+	int imgWidth = (int)fs["image_width"], imgHeight = (int)fs["image_height"];
+	cv::Size imgSize(imgWidth, imgHeight);
+	cv::Mat cameraMat, distCoeffs;
+	fs["camera_matrix"] >> cameraMat;
+	fs["distortion_error"] >> distCoeffs;
+	fs.release();
+
+	// ---  create board object
+	int markersX = 5, markersY = 7;
+	float markerLength = 0.027;
+	float markerSeparationLength = 0.0025;
+	cv::Ptr<cv::aruco::Dictionary> markerDict = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+	cv::Ptr<cv::aruco::GridBoard> gridboard =
+		cv::aruco::GridBoard::create(markersX, markersY, markerLength, markerSeparationLength, markerDict);
+	cv::Ptr<cv::aruco::Board> board = gridboard.staticCast<cv::aruco::Board>();
+
+
+	// --- Use RealSense 435
 	// Declare RealSense pipeline
 	rs2::pipeline pipe;
 
 	// Pipeline settings
 	rs2::config rsCfg;
-	rsCfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);  // from my laptop 30fps is the highest
+	rsCfg.enable_stream(RS2_STREAM_COLOR, imgWidth, imgHeight, RS2_FORMAT_BGR8, 60);
 
 	// start
 	pipe.start(rsCfg);
 	while (true)
 	{
+		double start = static_cast<double>(clock());
+
 		// get frame
 		rs2::frameset frames = pipe.wait_for_frames();
 		rs2::frame color = frames.get_color_frame();
 
 		// from frame, make Mat 
-		cv::Mat frame(cv::Size(640, 480), CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
+		cv::Mat frame(imgSize, CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
+		cv::Mat frameTmp = frame.clone();
 
-		cv::imshow("window", frame);
-		int key = cv::waitKey(1);
-		if (key == ESC_KEY)
-		{
-			break;
+		std::vector<int> ids;
+		std::vector<std::vector<cv::Point2f> > corners;
+		cv::aruco::detectMarkers(frame, markerDict, corners, ids);
+		// if at least one marker detected
+		if (ids.size() > 0) {
+			cv::aruco::drawDetectedMarkers(frameTmp, corners, ids);
+			cv::Vec3d rvec, tvec;
+			int valid = estimatePoseBoard(corners, ids, board, cameraMat, distCoeffs, rvec, tvec);
+			// if at least one board marker detected
+			if (valid > 0)
+				cv::aruco::drawAxis(frameTmp, cameraMat, distCoeffs, rvec, tvec, 0.1);
 		}
+
+		cv::imshow("window", frameTmp);
+		double fps = 60 * CLOCKS_PER_SEC / (static_cast<double>(clock()) * 1000 - start * 1000);
+		printf("%lf fps\n", fps);
+		int key = cv::waitKey(1);
+		if (key == ESC_KEY) break;
 	}
 
 	cv::destroyAllWindows();

@@ -7,17 +7,9 @@
 
 int main() try
 {
-	// Use RealSense 435
-	rs2::log_to_console(RS2_LOG_SEVERITY_ERROR);
-
-	// Declare RealSense pipeline
-	rs2::pipeline pipe;
-
-	// Pipeline settings
-	rs2::config rsCfg;
-	int imgWidth = 424, imgHeight = 240;
+	// --- settings
+	int imgWidth = 960, imgHeight = 540;
 	cv::Size imgSize(imgWidth, imgHeight);
-	rsCfg.enable_stream(RS2_STREAM_COLOR, imgWidth, imgHeight, RS2_FORMAT_BGR8, 60);  
 
 	enum Pattern { CHESSBOARD, CIRCLES_GRID, ASYMMETRIC_CIRCLES_GRID };
 	Pattern calibrationPattern = CHESSBOARD;
@@ -27,17 +19,51 @@ int main() try
 	const cv::Size boardSize(10, 7);
 	const float chessSize = 24.0;
 
-	// start
-	pipe.start(rsCfg);
+	// --- camera
+	bool useRealSense = true;
+	// Declare RealSense pipeline
+	rs2::pipeline pipe;
+	cv::VideoCapture cap;
+	int paramFocus = 15;  // focos parameter for C910, I don't know how to get 
+	if (useRealSense)
+	{
+		// Use RealSense 435
+		// rs2::log_to_console(RS2_LOG_SEVERITY_ERROR);
+
+		// Pipeline settings
+		rs2::config rsCfg;
+		rsCfg.disable_all_streams();
+		rsCfg.enable_stream(RS2_STREAM_COLOR, imgWidth, imgHeight, RS2_FORMAT_BGR8, 30);
+		// start
+		pipe.start(rsCfg);
+	}
+	else
+	{
+		cap = cv::VideoCapture(0);
+		cap.set(cv::CAP_PROP_FRAME_WIDTH, imgWidth);
+		cap.set(cv::CAP_PROP_FRAME_HEIGHT, imgHeight);
+		cap.set(cv::CAP_PROP_FPS, 30);
+		cap.set(cv::CAP_PROP_AUTOFOCUS, 0);
+		cap.set(cv::CAP_PROP_FOCUS, 15);
+	}
+
 	int minNumFrames = 10;
 	while (true)
 	{
+		double start = static_cast<double>(clock());
 		// get frame
-		rs2::frameset frames = pipe.wait_for_frames();
-		rs2::frame color = frames.get_color_frame();
-
-		// from frame, make Mat 
-		cv::Mat frame(cv::Size(imgWidth, imgHeight), CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
+		cv::Mat frame;
+		if (useRealSense)
+		{
+			rs2::frameset frames = pipe.wait_for_frames();
+			rs2::frame color = frames.get_color_frame();		
+			// make Mat 
+			frame = cv::Mat(cv::Size(imgWidth, imgHeight), CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
+		}
+		else
+		{
+			cap >> frame;
+		}
 		
 		bool found;
 		std::vector<cv::Point2f> bufCornerPts;
@@ -69,6 +95,8 @@ int main() try
 
 			cv::drawChessboardCorners(frame, boardSize, cv::Mat(bufCornerPts), found);
 			cv::imshow("calibration", frame);
+			double fps = 60 * CLOCKS_PER_SEC / (static_cast<double>(clock()) * 1000 - start * 1000);
+			printf("%lf fps\n", fps);
 			int key = cv::waitKey(1);
 			if (key == ESC_KEY) break;
 			else if (key == SPACE_KEY)
@@ -80,6 +108,8 @@ int main() try
 		}
 		else
 		{
+			double fps = 60 * CLOCKS_PER_SEC / (static_cast<double>(clock()) * 1000 - start * 1000);
+			printf("%lf fps\n", fps);
 			cv::imshow("calibration", frame);
 			int key = cv::waitKey(1);
 			if (key == ESC_KEY) break;
@@ -103,7 +133,7 @@ int main() try
 		std::vector<cv::Mat> rvecs, tvecs;
 		cv::Mat cameraMat = cv::Mat::eye(3, 3, CV_64F);
 		cv::Mat distCoeff = cv::Mat::zeros(8, 1, CV_64F);
-		bool useCalibrateCameraRO = true;
+		bool useCalibrateCameraRO = false;
 		double rms;
 		if (useCalibrateCameraRO)
 		{
@@ -163,9 +193,16 @@ int main() try
 			std::cout << "File can not be opened. " << std::endl;
 			return -1;
 		}
-		fs << "camera_type" << "D435";
+		if (useRealSense)
+		{
+			fs << "camera_type" << "D435";
+		}
+		else
+		{
+			fs << "camera_type" << "C910";
+			fs << "camera_focus_parameter" << paramFocus;
+		}
 		fs << "calibration_time" << date;
-		// fs << "camera_focus_parameter" << paramFocus;
 		fs << "image_width" << imgSize.width;
 		fs << "image_height" << imgSize.height;
 		fs << "board_width" << boardSize.width;
@@ -189,12 +226,20 @@ int main() try
 		cv::Mat frameUndistorted;
 		while (true)
 		{
-			// get frame
-			rs2::frameset frames = pipe.wait_for_frames();
-			rs2::frame color = frames.get_color_frame();
+			cv::Mat frame;
+			if (useRealSense)
+			{
+				// get frame
+				rs2::frameset frames = pipe.wait_for_frames();
+				rs2::frame color = frames.get_color_frame();
 
-			// from frame, make Mat 
-			cv::Mat frame(cv::Size(640, 480), CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
+				// from frame, make Mat 
+				frame = cv::Mat(imgSize, CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
+			}
+			else
+			{
+				cap >> frame;
+			}
 
 			cv::remap(frame, frameUndistorted, map1, map2, cv::INTER_LINEAR);
 			cv::resize(frame, frame, frameUndistorted.size());

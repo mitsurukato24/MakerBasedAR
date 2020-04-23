@@ -57,7 +57,10 @@
     <Import Project="..\..\..\..\..\OneDrive\OpenGL3props.props" />
     <Import Project="..\..\..\..\..\OneDrive\opencv430_with_cuda_and_realsense.props" />
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="..\..\..\..\..\OneDrive\OpenGL3props.props" />
+    <Import Project="..\..\..\..\..\OneDrive\opencv430_with_cuda_and_realsense.props" />
+  </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />

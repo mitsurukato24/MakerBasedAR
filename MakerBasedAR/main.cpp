@@ -2,7 +2,9 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/aruco.hpp>
 #include <librealsense2/rs.hpp>
-#include <time.h>
+#include <librealsense2\rs_advanced_mode.hpp>
+#include <librealsense2/rsutil.h>
+#include <chrono>
 
 #define ESC_KEY 27
 #define SPACE_KEY 32
@@ -18,6 +20,8 @@ int main() try
 
 	// --- open yml file for camera calibration
 	int imgWidth = (int)fs["image_width"], imgHeight = (int)fs["image_height"];
+	imgWidth = 640;
+	imgHeight = 480;
 	cv::Size imgSize(imgWidth, imgHeight);
 	cv::Mat cameraMat, distCoeffs;
 	fs["camera_matrix"] >> cameraMat;
@@ -40,22 +44,34 @@ int main() try
 
 	// Pipeline settings
 	rs2::config rsCfg;
-	rsCfg.enable_stream(RS2_STREAM_COLOR, imgWidth, imgHeight, RS2_FORMAT_BGR8, 60);
+	rsCfg.disable_all_streams();
+	rsCfg.enable_stream(RS2_STREAM_COLOR, imgWidth, imgHeight, RS2_FORMAT_BGR8, 30);
 
 	// start
 	pipe.start(rsCfg);
+	std::chrono::system_clock::time_point start, end;
 	while (true)
 	{
-		double start = static_cast<double>(clock());
+		start = std::chrono::system_clock::now();
 
-		// get frame
-		rs2::frameset frames = pipe.wait_for_frames();
+		// get frame	
+		rs2::frameset frames;
+		if (pipe.poll_for_frames(&frames))
+		{
+			
+		}
+		else
+		{
+			continue;
+		}
+
+		//rs2::frameset frames = pipe.wait_for_frames();
 		rs2::frame color = frames.get_color_frame();
 
 		// from frame, make Mat 
 		cv::Mat frame(imgSize, CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
 		cv::Mat frameTmp = frame.clone();
-
+		/*
 		std::vector<int> ids;
 		std::vector<std::vector<cv::Point2f> > corners;
 		cv::aruco::detectMarkers(frame, markerDict, corners, ids);
@@ -67,15 +83,22 @@ int main() try
 			// if at least one board marker detected
 			if (valid > 0)
 				cv::aruco::drawAxis(frameTmp, cameraMat, distCoeffs, rvec, tvec, 0.1);
-		}
 
-		cv::imshow("window", frameTmp);
-		double fps = 60 * CLOCKS_PER_SEC / (static_cast<double>(clock()) * 1000 - start * 1000);
+			cv::imshow("window", frameTmp);
+			double fps = 60 * CLOCKS_PER_SEC / (static_cast<double>(clock()) * 1000 - start * 1000);
+			printf("%lf fps\n", fps);
+			int key = cv::waitKey(1);
+			if (key == ESC_KEY) break;
+		}
+		*/
+		end = std::chrono::system_clock::now();
+		double fps = 1000000.0 / (static_cast<double> (std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()));
 		printf("%lf fps\n", fps);
+		cv::imshow("window", frameTmp);
 		int key = cv::waitKey(1);
 		if (key == ESC_KEY) break;
 	}
-
+	pipe.stop();
 	cv::destroyAllWindows();
 	return EXIT_SUCCESS;
 }

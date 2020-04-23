@@ -1,6 +1,7 @@
 #include <iostream>
 #include <opencv2//opencv.hpp>
 #include <librealsense2\rs.hpp>
+#include <chrono>
 
 #define ESC_KEY 27
 #define SPACE_KEY 32
@@ -8,7 +9,7 @@
 int main() try
 {
 	// --- settings
-	int imgWidth = 960, imgHeight = 540;
+	int imgWidth = 640, imgHeight = 480;
 	cv::Size imgSize(imgWidth, imgHeight);
 
 	enum Pattern { CHESSBOARD, CIRCLES_GRID, ASYMMETRIC_CIRCLES_GRID };
@@ -20,7 +21,7 @@ int main() try
 	const float chessSize = 24.0;
 
 	// --- camera
-	bool useRealSense = true;
+	bool useRealSense = false;
 	// Declare RealSense pipeline
 	rs2::pipeline pipe;
 	cv::VideoCapture cap;
@@ -47,10 +48,11 @@ int main() try
 		cap.set(cv::CAP_PROP_FOCUS, 15);
 	}
 
+	std::chrono::system_clock::time_point start, end;
 	int minNumFrames = 10;
 	while (true)
 	{
-		double start = static_cast<double>(clock());
+		start = std::chrono::system_clock::now();
 		// get frame
 		cv::Mat frame;
 		if (useRealSense)
@@ -95,8 +97,11 @@ int main() try
 
 			cv::drawChessboardCorners(frame, boardSize, cv::Mat(bufCornerPts), found);
 			cv::imshow("calibration", frame);
-			double fps = 60 * CLOCKS_PER_SEC / (static_cast<double>(clock()) * 1000 - start * 1000);
+
+			end = std::chrono::system_clock::now();
+			double fps = 1000000.0 / (static_cast<double> (std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()));
 			printf("%lf fps\n", fps);
+
 			int key = cv::waitKey(1);
 			if (key == ESC_KEY) break;
 			else if (key == SPACE_KEY)
@@ -108,8 +113,10 @@ int main() try
 		}
 		else
 		{
-			double fps = 60 * CLOCKS_PER_SEC / (static_cast<double>(clock()) * 1000 - start * 1000);
+			end = std::chrono::system_clock::now();
+			double fps = 1000000.0 / (static_cast<double> (std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()));
 			printf("%lf fps\n", fps);
+
 			cv::imshow("calibration", frame);
 			int key = cv::waitKey(1);
 			if (key == ESC_KEY) break;

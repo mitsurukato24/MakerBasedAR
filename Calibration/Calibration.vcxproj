@@ -54,7 +54,7 @@
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <Import Project="..\..\..\..\..\OneDrive\opencv430_with_cuda_and_realsense.props" />
+    <Import Project="..\..\..\..\..\OneDrive\opencv412.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>

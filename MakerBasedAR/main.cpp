@@ -12,6 +12,59 @@
 #define ESC_KEY 27
 #define SPACE_KEY 32
 
+void detectMarkersAndDrawCube(
+	cv::Mat &img,
+	const cv::Mat &camMat, const cv::Mat &distCoeffs,
+	const float markerLen,
+	const cv::Ptr<cv::aruco::Board> &board,
+	const cv::Ptr<cv::aruco::Dictionary> &markerDict,
+	const GLuint &backgroundID,
+	glm::mat4 &glModelMat, glm::mat4 &glViewMat, glm::mat4 &glProjMat,
+	glm::mat4 &glMVPMat, const GLuint &glMVPMatID,
+	const GLuint &objID,
+	const GLuint &vertexBuffer, const GLuint &colorBuffer
+	)
+{
+	// show background
+	cv::Mat imgTmp;
+	cv::cvtColor(img, imgTmp, cv::COLOR_BGR2RGB);
+	cv::flip(imgTmp, imgTmp, 0);
+	drawBackground(imgTmp, backgroundID);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	// detect markers
+
+	std::vector<int> ids;
+	std::vector<std::vector<cv::Point2f> > corners;
+	cv::aruco::detectMarkers(img, markerDict, corners, ids);
+	if (ids.size() > 0)
+	{
+		cv::Vec3d rvec, tvec;
+		int valid = cv::aruco::estimatePoseBoard(corners, ids, board, camMat, distCoeffs, rvec, tvec);
+		if (valid > 0)
+		{
+			cv::Mat R = cv::Mat::eye(3, 3, CV_64FC1);
+			cv::Mat T = cv::Mat::eye(4, 4, CV_64FC1);
+			rvec[0] *= -1.0f;
+			cv::Rodrigues(rvec, R);
+			tvec[1] *= -1.0; tvec[2] *= -1.0;
+			T(cv::Rect(0, 0, 3, 3)) = R.t() *1.0;
+			tvec /= markerLen;
+			T = (cv::Mat_<double>(4, 4) <<
+				R.at<double>(0, 0), R.at<double>(0, 1), R.at<double>(0, 2), 0.0f,
+				R.at<double>(1, 0), R.at<double>(1, 1), R.at<double>(1, 2), 0.0f,
+				R.at<double>(2, 0), R.at<double>(2, 1), R.at<double>(2, 2), 0.0f,
+				tvec(0), tvec(1), tvec(2), 1.0f
+				);
+
+			glViewMat = glm::make_mat4(reinterpret_cast<GLdouble*>(T.data));
+			glMVPMat = glProjMat * glViewMat * glModelMat;
+		}
+		drawCube(objID, glMVPMatID, glMVPMat, vertexBuffer, colorBuffer);
+	}
+
+}
+
 
 int main()
 {
@@ -27,7 +80,7 @@ int main()
 
 	// --- Create and compile our GLSL program from the shaders
 	GLuint objID = loadShaders("TransformVertexShader.vertexshader", "ColorFragmentShader.fragmentshader");
-	GLuint backgoundID = loadShaders("TransformVertexShader2.vertexshader", "TextureFragmentShader.fragmentshader");
+	GLuint backgroundID = loadShaders("TransformVertexShader2.vertexshader", "TextureFragmentShader.fragmentshader");
 
 	// --- open web camera and set params
 	cv::VideoCapture cap(0);
@@ -162,51 +215,20 @@ int main()
 
 	// --- start roop
 	std::chrono::system_clock::time_point start, end;
-	std::vector<int> ids;
-	std::vector<std::vector<cv::Point2f> > corners;
-	cv::Mat img, imgTmp, R, T;
-	R = cv::Mat::eye(3, 3, CV_64FC1);
-	T = cv::Mat::eye(4, 4, CV_64FC1);
-	cv::Vec3d rvec, tvec;
 	do {
 		start = std::chrono::system_clock::now();
 		// Clear the screen
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// read a frame
+		cv::Mat img;
 		cap >> img;
 
-		// show background
-		cv::cvtColor(img, imgTmp, cv::COLOR_BGR2RGB);
-		cv::flip(imgTmp, imgTmp, 0);
-		drawBackground(imgTmp, backgoundID);
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		// detect markers
-		corners.clear();	ids.clear();
-		cv::aruco::detectMarkers(img, markerDict, corners, ids);
-		if (ids.size() > 0)
-		{
-			int valid = cv::aruco::estimatePoseBoard(corners, ids, board, camMat, distCoeffs, rvec, tvec);
-			if (valid > 0)
-			{
-				rvec[0] *= -1.0f; 
-				cv::Rodrigues(rvec, R);
-				tvec[1] *= -1.0; tvec[2] *= -1.0;
-				T(cv::Rect(0, 0, 3, 3)) = R.t() *1.0;
-				tvec /= markerLen;
-				T = (cv::Mat_<double>(4, 4) <<
-					R.at<double>(0, 0), R.at<double>(0, 1), R.at<double>(0, 2), 0.0f,
-					R.at<double>(1, 0), R.at<double>(1, 1), R.at<double>(1, 2), 0.0f,
-					R.at<double>(2, 0), R.at<double>(2, 1), R.at<double>(2, 2), 0.0f,
-					tvec(0), tvec(1), tvec(2), 1.0f
-					);
-				
-				glViewMat = glm::make_mat4(reinterpret_cast<GLdouble*>(T.data));
-				glMVPMat = glProjMat * glViewMat * glModelMat;
-			}
-			drawCube(objID, glMVPMatID, glMVPMat, vertexBuffer, colorBuffer);
-		}
+		detectMarkersAndDrawCube(
+			img, camMat, distCoeffs, markerLen, board, markerDict, backgroundID,
+			glModelMat, glViewMat, glProjMat, glMVPMat, glMVPMatID,
+			objID, vertexBuffer, colorBuffer
+			);
 
 		// Swap buffers
 		glfwSwapBuffers(window);

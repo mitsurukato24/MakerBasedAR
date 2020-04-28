@@ -17,3 +17,16 @@ void drawCube(
 	const GLuint& vertexBuffer,
 	const GLuint& colorBuffer
 );
+
+void detectMarkersAndDrawCube(
+	cv::Mat &img, 
+	const cv::Mat &camMat, const cv::Mat &distCoeffs,
+	const float markerLen,
+	const cv::Ptr<cv::aruco::Board> &board,
+	const cv::Ptr<cv::aruco::Dictionary> &markerDict,
+	const GLuint &backgroundID,
+	glm::mat4 &glModelMat, glm::mat4 &glViewMat, glm::mat4 &glProjMat,
+	glm::mat4 &glMVPMat, const GLuint &glMVPMatID,
+	const GLuint &objID,
+	const GLuint &vertexBuffer, const GLuint &colorBuffer
+);

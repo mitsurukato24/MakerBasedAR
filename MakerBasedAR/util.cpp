@@ -5,12 +5,10 @@
 #include <fstream>
 #include <algorithm>
 #include <sstream>
-using namespace std;
-
 #include <stdlib.h>
 #include <string.h>
 #include <opencv2/opencv.hpp>
-#define GLEW_STATIC
+#include <opencv2/aruco.hpp>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -330,4 +328,57 @@ void drawCube(
 
 	glDisableVertexAttribArray(0);
 	glDisableVertexAttribArray(1);
+}
+
+void detectMarkersAndDrawCube(
+	cv::Mat &img,
+	const cv::Mat &camMat, const cv::Mat &distCoeffs,
+	const float markerLen,
+	const cv::Ptr<cv::aruco::Board> &board,
+	const cv::Ptr<cv::aruco::Dictionary> &markerDict,
+	const GLuint &backgroundID,
+	glm::mat4 &glModelMat, glm::mat4 &glViewMat, glm::mat4 &glProjMat,
+	glm::mat4 &glMVPMat, const GLuint &glMVPMatID,
+	const GLuint &objID,
+	const GLuint &vertexBuffer, const GLuint &colorBuffer
+)
+{
+	// show background
+	cv::Mat imgTmp;
+	cv::cvtColor(img, imgTmp, cv::COLOR_BGR2RGB);
+	cv::flip(imgTmp, imgTmp, 0);
+	drawBackground(imgTmp, backgroundID);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	// detect markers
+
+	std::vector<int> ids;
+	std::vector<std::vector<cv::Point2f> > corners;
+	cv::Ptr<cv::aruco::DetectorParameters> parameters = cv::aruco::DetectorParameters::create();
+	cv::aruco::detectMarkers(img, markerDict, corners, ids, parameters, cv::noArray(), camMat, distCoeffs);
+	if (ids.size() > 0)
+	{
+		cv::Vec3d rvec, tvec;
+		int valid = cv::aruco::estimatePoseBoard(corners, ids, board, camMat, distCoeffs, rvec, tvec);
+		if (valid > 0)
+		{
+			cv::Mat R = cv::Mat::eye(3, 3, CV_64FC1);
+			cv::Mat T = cv::Mat::eye(4, 4, CV_64FC1);
+			rvec[0] *= -1.0f;
+			cv::Rodrigues(rvec, R);
+			tvec[1] *= -1.0; tvec[2] *= -1.0;
+			T(cv::Rect(0, 0, 3, 3)) = R.t() *1.0;
+			tvec /= markerLen;
+			T = (cv::Mat_<double>(4, 4) <<
+				R.at<double>(0, 0), R.at<double>(0, 1), R.at<double>(0, 2), 0.0f,
+				R.at<double>(1, 0), R.at<double>(1, 1), R.at<double>(1, 2), 0.0f,
+				R.at<double>(2, 0), R.at<double>(2, 1), R.at<double>(2, 2), 0.0f,
+				tvec(0), tvec(1), tvec(2), 1.0f
+				);
+
+			glViewMat = glm::make_mat4(reinterpret_cast<GLdouble*>(T.data));
+			glMVPMat = glProjMat * glViewMat * glModelMat;
+		}
+		drawCube(objID, glMVPMatID, glMVPMat, vertexBuffer, colorBuffer);
+	}
 }
